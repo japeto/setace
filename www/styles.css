@@ -1,0 +1,9 @@
+
+.container-fluid {
+  max-width: 800px !important;
+  margin: 0 auto; /* Centra la página */
+  padding: 20px;
+}
+.shiny-input-container {
+  width: 100% !important;
+}
