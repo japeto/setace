@@ -143,7 +143,8 @@ server <- function(input, output, session) {
     if (step() == 1) {
       shinyjs::enable("btn_back")
         
-      if ( FALSE ) { # if (is.null(working_data())) {
+      # if ( FALSE ) { 
+      if (is.null(working_data())) {
         showModal(modalDialog(
           title = tags$div(
             icon("exclamation-triangle", class = "text-danger"),
@@ -548,6 +549,8 @@ server <- function(input, output, session) {
       session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Continuar con revisiones ✅ "))
       step(4)
     } else if (step() == 4) {
+      
+      session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Continuar ➡️"))
       
     }
   })
