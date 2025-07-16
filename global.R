@@ -8,7 +8,8 @@ library(shinyWidgets)
 library(writexl)
 library(openxlsx)
 library(dplyr)
-# library(lubridate)
+library(lubridate)
+library(purrr)
 
 options(shiny.maxRequestSize = 1024 * 1024^2)  # Aumenta el tamaño máximo de carga a 1 GB
 options(shiny.autoreload = TRUE)
