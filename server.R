@@ -55,13 +55,15 @@ server <- function(input, output, session) {
       )
     } else if (step() == 4) {
       req(working_data())
-      shinyjs::disable("file3")
+      req(datasets$mensual)
+      req(datasets$bimestral)
+      req(datasets$trimestral)
       tagList(
         h2("Paso 3: Descargar datos por periodicidad"),
         p("Seleccione la periodicidad con la que desea descargar los datos procesados:"),
         div(
           style = "margin-top: 10px;",
-          fileInput("file3", "Datos Mensual ajustada", accept = ".xlsx", ),
+          # fileInput("file3", "Datos Mensual ajustada", accept = ".xlsx", ),
           fileInput("file4", "Datos Bimensual ajustada", accept = ".xlsx"),
           fileInput("file5", "Datos Trimestral ajustada", accept = ".xlsx"),
         ),
@@ -70,6 +72,16 @@ server <- function(input, output, session) {
           downloadButton("download_mensual", "Descargar Mensual (.xlsx)", class = "btn-primary"),
           downloadButton("download_bimensual", "Descargar Bimensual (.xlsx)", class = "btn-success"),
           downloadButton("download_trimestral", "Descargar Trimestral (.xlsx)", class = "btn-info")
+        )
+      )
+    } else if (step() == 5) {
+      req(working_data())
+      tagList(
+        h2("Paso 4: Revisiones"),
+        p("Continue con la lectura y procesamiento de las revisiones"),
+        div(
+          style = "margin-top: 10px;",
+          fileInput("file6", "Datos Revisiones (Encriptada)", accept = ".xlsx"),
         )
       )
     }
@@ -155,14 +167,14 @@ server <- function(input, output, session) {
       } else {
         shinyWidgets::updateProgressBar(session, "progress", value = 36, title = "Inicia carga de archivos")
 
-        e <- new.env()
-        load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD Consumos.RData", envir = e)
-        data_list$file1 <- mget(ls(e), envir = e)[[1]]
-        working_data(data_list$file1)
-        
-        e <- new.env()
-        load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD SAC F.RData", envir = e)
-        data_list$file2 <- mget(ls(e), envir = e)[[1]]
+        # e <- new.env()
+        # load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD Consumos.RData", envir = e)
+        # data_list$file1 <- mget(ls(e), envir = e)[[1]]
+        # working_data(data_list$file1)
+        # 
+        # e <- new.env()
+        # load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD SAC F.RData", envir = e)
+        # data_list$file2 <- mget(ls(e), envir = e)[[1]]
         
         sac_data <- data_list$file1 
         con_sac_data <- data_list$file2
@@ -459,11 +471,11 @@ server <- function(input, output, session) {
       
       mensual <- Base2[grepl("\\.MENSUAL$", Base2$BD) | Base2$BD == "agrupacionmensual", ]
       bimensuales <- Base2[grepl("\\.BIMENSUAL$", Base2$BD) | Base2$BD == "agrupacionbimensual", ]
-      trimesuales <- Base2[grepl("\\.TRIMESUAL$", Base2$BD) | Base2$BD == "agrupaciontrimesual", ]
+      trimensuales <- Base2[grepl("\\.TRIMESUAL$", Base2$BD) | Base2$BD == "agrupaciontrimesual", ]
       
       datasets$mensual <- mensual
       datasets$bimestral <- bimensuales
-      datasets$trimestral <- trimesuales
+      datasets$trimestral <- trimensuales
       
       working_data(Base2)
       updateProgressBar(session, "progress", value = 85)
@@ -471,6 +483,8 @@ server <- function(input, output, session) {
       step(3)
     
     } else if (step() == 3) {
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Generando data mensual ➡️"))
       
       base3Mensual = datasets$mensual[,c(1:103,200)]
       variables <- paste("PERIODO_M", 1:24, sep = "")
@@ -493,11 +507,45 @@ server <- function(input, output, session) {
       datasets$mensual <- base3Mensual
       
       # leer bim ajustada
+      bimestral <- datasets$bimestral
+      if(!is.null(datasets$bimestra_ajustada)){
+        bimestral_ajustada <- datasets$bimestra_ajustada
+        bimestral <- merge(bimestral[,-c(56:199)],
+                           bimestral_ajustada, by.x = "CLIENTE_ID", by.y = "CLIENTE_ID", all = FALSE)
+      }
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Generando data bimestral ➡️"))
+      # se analizaran solo 24 meses es decir 13 periodos 
+      base3Bimensual = bimestral[,c(1:82)]
+      variables <- paste("PERIODO_M", 1:13, sep = "")
+      base3Bimensual <- base3Bimensual[complete.cases(base3Bimensual[variables]), ]
+      #Se observa si el individuo presenta o no mas de 5 consumos consecutivos en 0 
+      base3Bimensual$consecutivo0 <- sapply(1:nrow(base3Bimensual), function(i) {
+        tiene_consecutivos_cero(base3Bimensual[i, 57:82], n_consecutivos = 5)
+      })
+      datasets$bimestral <- base3Bimensual
+      
       # leer trim ajustada
-
+      trimestral <- datasets$trimestral
+      if(!is.null(datasets$trimestral_ajustada)){
+        trimestral_ajustada <- datasets$trimestral_ajustada
+        trimestral <- merge(trimestral[,-c(56:199)],
+                            trimestral_ajustada, by.x = "CLIENTE_ID", by.y = "CLIENTE_ID", all = FALSE)
+      }
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Generando data trimestral ➡️"))
+      # se analizaran solo 24 meses es decir 7 periodos 
+      base3Trimensual = trimestral[,c(1:74)]
+      variables <- paste("PERIODO_M", 1:9, sep = "")
+      base3Trimensual <- base3Trimensual[complete.cases(base3Trimensual[variables]), ]
+      #Se observa si el individuo presenta o no mas de 5 consumos consecutivos en 0 
+      base3Trimensual$consecutivo0 <- sapply(1:nrow(base3Trimensual), function(i) {
+        tiene_consecutivos_cero(base3Trimensual[i, 57:74], n_consecutivos = 5)
+      })
+      
       
       updateProgressBar(session, "progress", value = 95)      
-      session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Finalizar ✅ "))
+      session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Continuar con revisiones ✅ "))
       step(4)
     } else if (step() == 4) {
       
@@ -526,7 +574,7 @@ server <- function(input, output, session) {
       paste0("Base3_Mensual_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      writexl::write_xlsx(datos_mensual(), file)
+      writexl::write_xlsx(datasets$mensual, file)
     }
   )
 
@@ -535,7 +583,7 @@ server <- function(input, output, session) {
       paste0("Base3_Bimensual_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      writexl::write_xlsx(datos_bimensual(), file)
+      writexl::write_xlsx(datasets$bimestral, file)
     }
   )
 
@@ -544,7 +592,7 @@ server <- function(input, output, session) {
       paste0("Base3_Trimestral_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      writexl::write_xlsx(datos_trimestral(), file)
+      writexl::write_xlsx(datasets$trimestral, file)
     }
   )
   
