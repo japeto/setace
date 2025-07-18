@@ -61,12 +61,12 @@ server <- function(input, output, session) {
       tagList(
         h2("Paso 3: Descargar datos por periodicidad"),
         p("Seleccione la periodicidad con la que desea descargar los datos procesados:"),
-        div(
-          style = "margin-top: 10px;",
-          # fileInput("file3", "Datos Mensual ajustada", accept = ".xlsx", ),
-          fileInput("file4", "Datos Bimensual ajustada", accept = ".xlsx"),
-          fileInput("file5", "Datos Trimestral ajustada", accept = ".xlsx"),
-        ),
+        # div(
+        #   style = "margin-top: 10px;",
+        #   # fileInput("file3", "Datos Mensual ajustada", accept = ".xlsx", ),
+        #   fileInput("file4", "Datos Bimensual ajustada", accept = ".xlsx"),
+        #   fileInput("file5", "Datos Trimestral ajustada", accept = ".xlsx"),
+        # ),
         div(
           style = "margin-top: 10px;",
           downloadButton("download_mensual", "Descargar Mensual (.xlsx)", class = "btn-primary"),
@@ -81,7 +81,22 @@ server <- function(input, output, session) {
         p("Continue con la lectura y procesamiento de las revisiones"),
         div(
           style = "margin-top: 10px;",
-          fileInput("file6", "Datos Revisiones (Encriptada)", accept = ".xlsx"),
+          fileInput("file6", "Datos Revisiones (Encriptada)", accept = ".RData"),
+        )
+      )
+    } else if (step() == 6) {
+      req(working_data())
+      req(datasets$mensual)
+      req(datasets$bimestral)
+      req(datasets$trimestral)
+      tagList(
+        h2("Paso 5: Descargar datos con revisión"),
+        p("Seleccione la periodicidad con la que desea descargar los datos procesados:"),
+        div(
+          style = "margin-top: 10px;",
+          downloadButton("download_mensual", "Descargar Mensual (.xlsx)", class = "btn-primary"),
+          downloadButton("download_bimensual", "Descargar Bimensual (.xlsx)", class = "btn-success"),
+          downloadButton("download_trimestral", "Descargar Trimestral (.xlsx)", class = "btn-info")
         )
       )
     }
@@ -128,7 +143,7 @@ server <- function(input, output, session) {
   observeEvent(input$file6, {
     req(input$file6)
     e <- new.env()
-    load(input$file5$datapath, envir = e)
+    load(input$file6$datapath, envir = e)
     data_list$file6 <- mget(ls(e), envir = e)[[1]]
   })
 
@@ -143,8 +158,8 @@ server <- function(input, output, session) {
     if (step() == 1) {
       shinyjs::enable("btn_back")
         
-      # if ( FALSE ) { 
-      if (is.null(working_data())) {
+      if ( FALSE ) {
+      # if (is.null(working_data())) {
         showModal(modalDialog(
           title = tags$div(
             icon("exclamation-triangle", class = "text-danger"),
@@ -168,14 +183,14 @@ server <- function(input, output, session) {
       } else {
         shinyWidgets::updateProgressBar(session, "progress", value = 36, title = "Inicia carga de archivos")
 
-        # e <- new.env()
-        # load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD Consumos.RData", envir = e)
-        # data_list$file1 <- mget(ls(e), envir = e)[[1]]
-        # working_data(data_list$file1)
-        # 
-        # e <- new.env()
-        # load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD SAC F.RData", envir = e)
-        # data_list$file2 <- mget(ls(e), envir = e)[[1]]
+        e <- new.env()
+        load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD Consumos.RData", envir = e)
+        data_list$file1 <- mget(ls(e), envir = e)[[1]]
+        working_data(data_list$file1)
+
+        e <- new.env()
+        load("/Users/japeto/WorkS/pacheco/asistente06072025/data/BD SAC F.RData", envir = e)
+        data_list$file2 <- mget(ls(e), envir = e)[[1]]
         
         sac_data <- data_list$file1 
         con_sac_data <- data_list$file2
@@ -236,7 +251,7 @@ server <- function(input, output, session) {
         shinyWidgets::updateProgressBar(
           session, "progress", 
           value = 45, 
-          title = ""
+          title = "Revisión de los datos preliminares"
         )
         session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Continuar...➡️"))
         step(2)
@@ -479,7 +494,7 @@ server <- function(input, output, session) {
       datasets$trimestral <- trimensuales
       
       working_data(Base2)
-      updateProgressBar(session, "progress", value = 85)
+      updateProgressBar(session, "progress", value = 85, title = "Filtrado por periodicidad")
       session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Filtrado por periodicidad ➡️"))
       step(3)
     
@@ -543,16 +558,137 @@ server <- function(input, output, session) {
       base3Trimensual$consecutivo0 <- sapply(1:nrow(base3Trimensual), function(i) {
         tiene_consecutivos_cero(base3Trimensual[i, 57:74], n_consecutivos = 5)
       })
-      
-      
-      updateProgressBar(session, "progress", value = 95)      
       session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Continuar con revisiones ✅ "))
-      step(4)
-    } else if (step() == 4) {
+      updateProgressBar(session, "progress", value = 95, title="Extracción y transformación parcial")      
+      step(5)
+    } else if (step() == 5) {
       
-      session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Continuar ➡️"))
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Leyendo archivo de revisiones ➡️"))
       
+      reviews_data <- data_list$file6
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Revision: Seleccionado columnas ➡️"))
+      #elimino las variables no relevantes
+      # sapply(reviews_data,function (x) {length(unique(x))} )
+      column_names <- c(
+        "CLIENTE", "REVISION", "FECHA_REVISION","CONTRATISTA", "REVISOR",
+        "DES_MOTIVO", "OBS_INI", "CIERRE", "AFORO", "NOT_NOMBRE", "OBS_REVISOR",
+        "RESULTADO"
+      )
+      # Eliminar esas columnas del data.frame
+      reviews_data <- reviews_data[ , !(names(reviews_data) %in% column_names) ]
+      # reviews_data = reviews_data[,-c(1,3,6,8,10,13,16,19,20,21)]
+      # 
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Revision: Cambiando tipado I ➡️"))
+      
+      print(colnames(reviews_data))
+      # 
+      nombres_variables <- colnames(reviews_data)
+      reviews_data[nombres_variables] <- lapply(reviews_data[nombres_variables], function(x) {
+        iconv(x, from = "latin1", to = "UTF-8")
+      })
+      
+      # 
+      ## transformación de variables
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Revision: Cambiando tipado II ➡️"))
+      #
+      print(length(dmy(reviews_data$FECHA_REVISION)) )
+      
+      reviews_data$FECHA_REVISION = dmy(reviews_data$FECHA_REVISION)
+      
+      print(length(as.factor(reviews_data$CONTRATISTA)) )
+      
+      reviews_data$CONTRATISTA = as.factor(reviews_data$CONTRATISTA)
+      reviews_data$REVISOR = as.factor(reviews_data$REVISOR)
+      reviews_data$DES_MOTIVO = as.factor(reviews_data$DES_MOTIVO)
+      reviews_data$RESULTADO = as.factor(reviews_data$RESULTADO)
+      # 
+      ## 
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Categorizando Fraude/No fraude ➡️"))
+      reviews_data$Fraude <- ifelse(reviews_data$RESULTADO == "Fraude", "Fraude", "No Fraude")
+      # 
+      ## 
+      unica_por_mes <- reviews_data %>%
+        mutate(MES = format(FECHA_REVISION, "%Y-%m")) %>% # Crear columna de mes en formato "YYYY-MM"
+        group_by(CLIENTE, MES) %>% # Agrupar por cliente y mes
+        arrange(desc(RESULTADO == "Fraude")) %>% # Priorizar los fraudes
+        slice(1) %>% # Seleccionar la primera fila (fraude si existe, sino cualquier otro)
+        ungroup() # Desagrupar
+      # 
+      ## 
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Ajustando fechas en DB ➡️"))
+      # 
+      unica_por_mes <- unica_por_mes %>%
+        mutate(FECHA_REVISION = as.Date(paste0(format(FECHA_REVISION, "%Y-%m"), "-01")))
+      #
+      ##
+      reviews_total = unica_por_mes %>%
+        group_by(CLIENTE) %>%
+        summarise(
+          total_revisiones = n(),  # Contar cuántas veces aparece el cliente (cantidad de revisiones)
+          total_fraudes = sum(Fraude == "Fraude", na.rm = TRUE)  # Contar cuántos fraudes tiene
+        ) %>%
+        mutate(
+          total_revisiones = ifelse(is.na(total_revisiones), 0, total_revisiones),  # Para los que no tienen revisiones, poner 0
+          total_fraudes = ifelse(is.na(total_fraudes), 0, total_fraudes)  # Para los que no tienen fraudes, poner 0
+        )
+      
+      # session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Cambiando tipado II ➡️"))
+      # new_data <- working_data()
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Mensual: Clientes comunes ➡️"))
+      clientes_comunes <- intersect(unique(datasets$mensual$CLIENTE_ID), unique(unica_por_mes$CLIENTE))
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Mensual: Filtrando base ➡️"))
+      mensual_filtrada <- datasets$mensual[datasets$mensual$CLIENTE_ID %in% clientes_comunes, ]
+      rev_unica_mensual <- unica_por_mes[unica_por_mes$CLIENTE %in% clientes_comunes, ]
+      
+      if("CLIENTE" %in% colnames(rev_unica_mensual) ){
+        names(rev_unica_mensual)[names(rev_unica_mensual) == "CLIENTE"] <- "CLIENTE_ID"  
+      }
+      
+      mensual_combinada <- merge(mensual_filtrada, rev_unica_mensual, by = "CLIENTE_ID")
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Mensual: Binarización de casos ➡️"))
+      mensual_combinada$Fraude_binaria <- ifelse(mensual_combinada$Fraude.y == "Fraude", 1, 0)
+      datasets$mensual <- mensual_combinada
+      #
+      ## Bimestral
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Bimestral: Clientes comunes ➡️"))
+      clientes_comunes2 <- intersect(unique(datasets$bimestral$CLIENTE_ID), unique(unica_por_mes$CLIENTE))
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Bimestral: Filtrando base ➡️"))
+      bimestral_filtrada <- datasets$bimestral[datasets$bimestral$CLIENTE_ID %in% clientes_comunes2, ]
+      rev_unica_bimestral <- unica_por_mes[unica_por_mes$CLIENTE %in% clientes_comunes2, ]
+      
+      if("CLIENTE" %in% colnames(rev_unica_bimestral) ){
+        names(rev_unica_bimestral)[names(rev_unica_bimestral) == "CLIENTE"] <- "CLIENTE_ID"  
+      }
+      bimestral_combinada <- merge(bimestral_filtrada, rev_unica_bimestral, by = "CLIENTE_ID")
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Bimestral: Binarización de casos ➡️"))
+      bimestral_combinada$Fraude_binaria <- ifelse(bimestral_combinada$Fraude == "Fraude", 1, 0)
+      datasets$bimestral <- bimestral_combinada
+      #
+      ## Trimestral
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Trimestral: Clientes comunes ➡️"))
+      clientes_comunes3 <- intersect(unique(datasets$trimestral$CLIENTE_ID), unique(unica_por_mes$CLIENTE))
+      
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Trimestral: Filtrando base ➡️"))
+      trimestral_filtrada <- datasets$trimestral[datasets$trimestral$CLIENTE_ID %in% clientes_comunes3, ]
+      rev_unica_trimestral <- unica_por_mes[unica_por_mes$CLIENTE %in% clientes_comunes3, ]
+      
+      if("CLIENTE" %in% colnames(rev_unica_trimestral) ){
+        names(rev_unica_trimestral)[names(rev_unica_trimestral) == "CLIENTE"] <- "CLIENTE_ID"  
+      }
+      trimestral_combinada <- merge(trimestral_filtrada, rev_unica_trimestral, by = "CLIENTE_ID")
+      session$sendCustomMessage("disable_button", list(id = "btn_next", text = "Trimestral: Binarización de casos ➡️"))
+      trimestral_combinada$Fraude_binaria <- ifelse(trimestral_combinada$Fraude == "Fraude", 1, 0)      
+      datasets$trimestral <- trimestral_combinada
+      
+      updateProgressBar(session, "progress", value = 100, title="Extracción y transformación completada")      
+      session$sendCustomMessage("enable_button", list(id = "btn_next", text = "Terminar ➡️" ))
+      step(1)
     }
+    
   })
   
   observeEvent(input$btn_back, {

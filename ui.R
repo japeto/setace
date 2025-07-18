@@ -29,7 +29,7 @@ ui <- fluidPage(
   uiOutput("dynamic_ui"),
   br(),
   br(),
-  progressBar(id = "progress", value = 0, total = 5, title = "Progreso del asistente", display_pct = TRUE),
+  progressBar(id = "progress", value = 0, total = 100, title = "Progreso del asistente", display_pct = TRUE),
   br(),
   fluidRow(
     column(6, actionButton("btn_back", "⬅️ Atrás", class = "btn btn-warning w-100")),
